@@ -1,4 +1,4 @@
-Copyright (c) 2014 Eugene Correia
+Copyright (c) 2015 Eugene Correia, Timm Liu
 
 MIT License
 

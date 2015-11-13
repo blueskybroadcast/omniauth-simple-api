@@ -6,8 +6,8 @@ require 'omniauth-simple-api/version'
 Gem::Specification.new do |spec|
   spec.name          = "omniauth-simple-api"
   spec.version       = Omniauth::SimpleApi::VERSION
-  spec.authors       = ["Eugene Correia"]
-  spec.email         = ["ecorreia@blueskybroadcast.com"]
+  spec.authors       = ["Eugene Correia", "Timm Liu"]
+  spec.email         = ["ecorreia@blueskybroadcast.com", "tliu@blueskybroadcast.com"]
   spec.summary       = %q{SimpleApi Omniauth Gem}
   spec.description   = %q{SimpleApi Ominauth gem using oauth2 specs}
   spec.homepage      = ""
