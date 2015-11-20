@@ -71,11 +71,7 @@ module OmniAuth
       end
 
       def customer_id
-        raw_info['customerId'].split('|').first
-      end
-
-      def sub_customer_id
-        raw_info['customerId'].split('|').last
+        raw_info['customerId']
       end
 
       private
