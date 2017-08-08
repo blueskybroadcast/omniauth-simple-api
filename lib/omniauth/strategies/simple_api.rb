@@ -35,22 +35,35 @@ module OmniAuth
 
       def request_phase
         slug = session['omniauth.params']['origin'].gsub(/\//,"")
+        account = Account.find_by(slug: slug)
+        @app_event = account.app_events.create(activity_type: 'sso')
 
         auth_request = authorize(callback_url, slug)
+        unless auth_request
+          @app_event.logs.create(level: 'error', text: 'Invalid credentials')
+          return fail!(:invalid_credentials)
+        end
         redirect auth_request["data"]["authUrl"]
       end
 
       def callback_phase
+        slug = request.params['slug']
+        @app_event = account.app_events.where(id: request.params['event']).first_or_create(activity_type: 'sso')
+
         if customer_token
 
           self.access_token = {
-            :token => customer_token
+            token: customer_token
           }
 
           self.env['omniauth.auth'] = auth_hash
-          self.env['omniauth.origin'] = '/' + request.params['slug']
+          self.env['omniauth.origin'] = '/' + slug
+          self.env['omniauth.app_event_id'] = @app_event.id
+          finalize_app_event
           call_app!
         else
+          @app_event.logs.create(level: 'error', text: 'Invalid credentials')
+          @app_event.fail!
           fail!(:invalid_credentials)
         end
       end
@@ -85,7 +98,10 @@ module OmniAuth
       end
 
       def authorize(callback, slug)
-        callback_url = "#{callback}?slug=#{slug}"
+        callback_url = "#{callback}?slug=#{slug}&event=#{@app_event.id}"
+
+        request_log = "SimpleAPI Authentication Request:\nGET #{auth_url}?return=#{callback_url}"
+        @app_event.logs.create(level: 'info', text: request_log)
 
         response = Typhoeus.get(auth_url + "?return=#{callback_url}",
           headers: { Authorization: "Basic #{auth_token}" }
@@ -95,6 +111,7 @@ module OmniAuth
         if response.success?
           JSON.parse(response.body)
         else
+          @app_event.fail!
           nil
         end
       end
@@ -104,6 +121,9 @@ module OmniAuth
       end
 
       def get_member_roles
+        request_log = "SimpleAPI Authentication Request:\nGET #{member_roles_url}"
+        @app_event.logs.create(level: 'info', text: request_log)
+
         response = Typhoeus.get(member_roles_url,
           headers: { Authorization: "Basic #{auth_token}" }
         )
@@ -117,6 +137,9 @@ module OmniAuth
       end
 
       def get_user_info(customer_token)
+        request_log = "SimpleAPI Authentication Request:\nGET #{user_info_url}?token=#{customer_token}"
+        @app_event.logs.create(level: 'info', text: request_log)
+
         response = Typhoeus.get(user_info_url + "?token=#{customer_token}",
           headers: { Authorization: "Basic #{auth_token}" })
         log_request_details(__callee__, response)
@@ -134,6 +157,10 @@ module OmniAuth
           "server: #{response.headers['server']}; "\
           "request-id: #{response.headers['request-id']}; "\
           "response-time: #{response.headers['response-time']}; %%"
+
+        response_log = "SimpleAPI Authentication Response (code: #{response&.code}):\n#{response.inspect}"
+        log_level = response.success? ? 'info' : 'error'
+        @app_event.logs.create(level: log_level, text: response_log)
       end
 
       def member_roles_url
@@ -142,6 +169,19 @@ module OmniAuth
 
       def user_info_url
         "#{options.client_options.site}#{options.client_options.user_info_url}"
+      end
+
+      def finalize_app_event
+        app_event_data = {
+          user_info: {
+            uid: raw_info['customerId'],
+            first_name: info[:first_name],
+            last_name: info[:last_name],
+            email: info[:email]
+          }
+        }
+
+        @app_event.update(raw_data: app_event_data)
       end
     end
   end
