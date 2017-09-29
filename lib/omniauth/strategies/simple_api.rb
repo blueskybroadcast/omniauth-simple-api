@@ -26,7 +26,7 @@ module OmniAuth
       end
 
       extra do
-        { :raw_info => raw_info }
+        { raw_info: raw_info }
       end
 
       def creds
@@ -34,7 +34,7 @@ module OmniAuth
       end
 
       def request_phase
-        slug = session['omniauth.params']['origin'].gsub(/\//,"")
+        slug = session['omniauth.params']['origin'].gsub(/\//, '')
         account = Account.find_by(slug: slug)
         @app_event = account.app_events.create(activity_type: 'sso')
 
@@ -43,11 +43,12 @@ module OmniAuth
           @app_event.logs.create(level: 'error', text: 'Invalid credentials')
           return fail!(:invalid_credentials)
         end
-        redirect auth_request["data"]["authUrl"]
+        redirect auth_request['data']['authUrl']
       end
 
       def callback_phase
         slug = request.params['slug']
+        account = Account.find_by(slug: slug)
         @app_event = account.app_events.where(id: request.params['event']).first_or_create(activity_type: 'sso')
 
         if customer_token
@@ -69,7 +70,7 @@ module OmniAuth
       end
 
       def auth_hash
-        hash = AuthHash.new(:provider => name, :uid => uid)
+        hash = AuthHash.new(provider: name, uid: uid)
         hash.info = info
         hash.credentials = creds
         hash
