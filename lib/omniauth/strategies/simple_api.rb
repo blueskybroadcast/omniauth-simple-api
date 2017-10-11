@@ -39,10 +39,12 @@ module OmniAuth
         @app_event = account.app_events.create(activity_type: 'sso')
 
         auth_request = authorize(callback_url, slug)
+
         unless auth_request
           @app_event.logs.create(level: 'error', text: 'Invalid credentials')
           return fail!(:invalid_credentials)
         end
+
         redirect auth_request['data']['authUrl']
       end
 
@@ -138,7 +140,7 @@ module OmniAuth
       end
 
       def get_user_info(customer_token)
-        request_log = "SimpleAPI Authentication Request:\nGET #{user_info_url}?token=#{customer_token}"
+        request_log = "SimpleAPI Authentication Request:\nGET #{user_info_url}?token=#{Provider::SECURITY_MASK}"
         @app_event.logs.create(level: 'info', text: request_log)
 
         response = Typhoeus.get(user_info_url + "?token=#{customer_token}",
