@@ -54,10 +54,7 @@ module OmniAuth
         @app_event = account.app_events.where(id: request.params['event']).first_or_create(activity_type: 'sso')
 
         if customer_token
-
-          self.access_token = {
-            token: customer_token
-          }
+          self.access_token = { token: customer_token }
 
           self.env['omniauth.auth'] = auth_hash
           self.env['omniauth.origin'] = '/' + slug
@@ -124,6 +121,7 @@ module OmniAuth
       end
 
       def get_member_roles
+        result = nil
         request_log = "SimpleAPI Authentication Request:\nGET #{member_roles_url}"
         @app_event.logs.create(level: 'info', text: request_log)
 
@@ -132,26 +130,28 @@ module OmniAuth
         )
         log_request_details(__callee__, response)
 
-        if response.success?
-          JSON.parse(response.body)['data']['roles']
-        else
-          nil
-        end
+        result = JSON.parse(response.body).dig('data', 'roles') if response.success?
+        result
       end
 
       def get_user_info(customer_token)
-        request_log = "SimpleAPI Authentication Request:\nGET #{user_info_url}?token=#{Provider::SECURITY_MASK}"
+        result = {}
+        request_log = "SimpleAPI Get User Info Request:\nGET #{user_info_url}?token=#{Provider::SECURITY_MASK}"
         @app_event.logs.create(level: 'info', text: request_log)
 
         response = Typhoeus.get(user_info_url + "?token=#{customer_token}",
           headers: { Authorization: "Basic #{auth_token}" })
         log_request_details(__callee__, response)
 
-        if response.success?
-          JSON.parse(response.body)['data']['customers'].first
-        else
-          nil
+        result = JSON.parse(response.body).data('data', 'customers')&.first if response.success?
+
+        unless result.present?
+          @app_event.logs.create(level: 'error', text: "An error occurred while getting user info (code: #{response.code}):\n#{response.body}")
+          @app_event.fail!
+          return {}
         end
+
+        result
       end
 
       def log_request_details(callee, response)
