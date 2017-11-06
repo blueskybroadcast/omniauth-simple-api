@@ -143,7 +143,10 @@ module OmniAuth
           headers: { Authorization: "Basic #{auth_token}" })
         log_request_details(__callee__, response)
 
-        result = JSON.parse(response.body).data('data', 'customers')&.first if response.success?
+        if response.success?
+          json = JSON.parse(response.body)
+          result = json['data']['customers'].first if json&.[]('data')&.[]('customers').present?
+        end
 
         unless result.present?
           @app_event.logs.create(level: 'error', text: "An error occurred while getting user info (code: #{response.code}):\n#{response.body}")
